@@ -6,14 +6,14 @@ A utility function to merge together many frames into a video.
 
 from progress.bar import Bar
 import numpy as np
-import datetime
 import copy
 import glob
 import time
-import math
 import sys
 import cv2
 import os
+
+DEBUG = True
 
 def atoi(text):
     # A helper function to return digits inside text
@@ -26,53 +26,52 @@ def natural_keys(text):
 
 def make_heatmap():
   fileinput = '../output/project.avi'
-  capture = cv2.VideoCapture(fileinput)
-  background_subtractor = cv2.createBackgroundSubtractorMOG2()
-  length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-
+  cap = cv2.VideoCapture(fileinput)
+  fgbg = cv2.createBackgroundSubtractorMOG()
+  
+  #num_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+  num_frames = 100
+    
   bar = Bar('Processing Frames', max=length)
   for i in range(0, length):
-    ret, frame = capture.read()
-    #frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) 
-
     if i == 0:
+      ret, frame = cap.read()
       first_frame = copy.deepcopy(frame)
-      height, width, layers = frame.shape
+      frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+      height, width = gray.shape[:2]
       accum_image = np.zeros((height, width), np.uint8)
-
     else:
-      filter = background_subtractor.apply(frame)  # remove the background
-      cv2.imwrite('../output/frame.jpg', frame)
-      cv2.imwrite('../output/diff-bkgnd-frame.jpg', filter)
+      ret, frame = cap.read()
+      gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+      fgmask = fgbg.apply(gray)  
+      cv2.imwrite('../output/diff-bkgnd-frame.jpg', fgmask)
 
-      threshold = 127
-      maxValue = 255
-      ret, th0 = cv2.threshold(filter, threshold, maxValue, cv2.THRESH_BINARY)
-      th1 = cv2.adaptiveThreshold(filter,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
-
+      threshold = 2
+      maxValue = 2
+      ret, th1 = cv2.threshold(fgmask, thresh, maxValue, cv2.THRESH_BINARY)
+      #th2 = cv2.adaptiveThreshold(filter,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+      cv2.imwrite('diff-th1.jpg', th1)
+        
       accum_image = cv2.add(accum_image, th1)
       cv2.imwrite('../output/mask.jpg', accum_image)
-
-      color_image_video = cv2.applyColorMap(accum_image, cv2.COLORMAP_SUMMER)
-      video_frame = cv2.addWeighted(frame, 0.7, color_image_video, 0.7, 0)
-
-      name = "../output/frames/frame%d.jpg" % i
-      cv2.imwrite(name, video_frame)
 
       if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
     bar.next()
 
-  bar.finish()
-
-  make_video('/home/pi/git/Camera_App/output/frames/', '../output/heatmap.avi')
-
-  color_image = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
+  color_image = im_color = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
+  cv2.imwrite('diff-color.jpg', color_image)
+    
   result_overlay = cv2.addWeighted(first_frame, 0.7, color_image, 0.7, 0)
-
-  cv2.imwrite('../output/diff-overlay.jpg', result_overlay)
+  cv2.imwrite('diff-overlay.jpg', result_overlay)
+    
+  bar.finish()
   capture.release()
+
+  #make_video('/home/pi/git/Camera_App/output/frames/', '../output/heatmap.avi')    
+  #name = "../output/frames/frame%d.jpg" % i
+  #cv2.imwrite(name, video_frame)
 
 def make_video(input, output):
   img_array = sorted(glob.glob(input + '*.jpg'), key=os.path.getmtime)
