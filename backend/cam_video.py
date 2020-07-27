@@ -29,7 +29,7 @@ def make_heatmap():
   num_frames = 100
 
   bar = Bar('Processing Frames', max=num_frames)
-  for i in range(0, length):
+  for i in range(0, num_frames):
     if i == 0:
       ret, frame = cap.read()
       first_frame = copy.deepcopy(frame)
@@ -37,15 +37,12 @@ def make_heatmap():
       height, width = gray.shape[:2]
       accum_image = np.zeros((height, width), np.uint8)
     else:
-
-      print('done')
-      time.sleep(123123)
       ret, frame = cap.read()
       gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
       fgmask = fgbg.apply(gray)  
       cv2.imwrite('../output/diff-bkgnd-frame.jpg', fgmask)
 
-      threshold = 2
+      thresh = 2
       maxValue = 2
       ret, th1 = cv2.threshold(fgmask, thresh, maxValue, cv2.THRESH_BINARY)
       #th2 = cv2.adaptiveThreshold(filter,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
@@ -65,7 +62,7 @@ def make_heatmap():
   cv2.imwrite('diff-overlay.jpg', result_overlay)
 
   bar.finish()
-  capture.release()
+  cap.release()
 
   #make_video('/home/pi/git/Camera_App/output/frames/', '../output/heatmap.avi')    
   #name = "../output/frames/frame%d.jpg" % i
