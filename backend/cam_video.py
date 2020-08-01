@@ -1,6 +1,7 @@
 """
 A utility function to merge together many frames into a video.
 """
+from datetime import datetime
 from progress.bar import Bar
 import numpy as np
 import copy
@@ -12,6 +13,61 @@ import os
 
 DEBUG = True
 
+def drawLabel(img, text, pos, bg_color):
+    font_face = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 0.4
+    color = (0, 0, 0)
+    thickness = cv2.FILLED
+    margin = 2
+
+    txt_size = cv2.getTextSize(text, font_face, scale, thickness)
+
+    end_x = pos[0] + txt_size[0][0] + margin
+    end_y = pos[1] - txt_size[0][1] - margin
+
+    cv2.rectangle(img, pos, (end_x, end_y), bg_color, thickness)
+    cv2.putText(img, text, pos, font_face, scale, color, 1, cv2.LINE_AA)
+
+def drawTitle(frame, text):
+    font_face = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 1
+    color = (0, 0, 0)
+    thickness = cv2.FILLED
+    margin = 2
+
+    txt_size = cv2.getTextSize(text, font_face, scale, thickness)
+    try:
+      h, w, layers = frame.shape
+      pos = (int(w/2 - txt_size[0][0]/2), txt_size[0][1] + margin)
+      end_x = pos[0] + txt_size[0][0] + margin
+      end_y = pos[1] - txt_size[0][1] - margin
+
+      cv2.rectangle(frame, pos, (end_x, end_y), (255,255,255), thickness)
+      cv2.putText(frame, text, pos, font_face, scale, color, 1, cv2.LINE_AA)
+    except:
+      print("test") 
+
+def drawTime(frame, file):
+    font_face = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 1
+    color = (0, 0, 0)
+    thickness = cv2.FILLED
+    margin = 2
+
+    timestamp = os.path.getmtime(file)
+    text = str(datetime.fromtimestamp(timestamp)).split(".")[0]
+    txt_size = cv2.getTextSize(text, font_face, scale, thickness)
+    try:
+      h, w, layers = frame.shape
+      pos = (int(w/2 - txt_size[0][0]/2), h - 3*txt_size[0][1] + margin)
+      end_x = pos[0] + txt_size[0][0] + margin
+      end_y = pos[1] - txt_size[0][1] - margin
+      cv2.rectangle(frame, pos, (end_x, end_y), (255,255,255), thickness)
+      cv2.putText(frame, text, pos, font_face, scale, color, 1, cv2.LINE_AA)
+    except:
+      print(file)
+
+
 def atoi(text):
     # A helper function to return digits inside text
     return int(text) if text.isdigit() else text
@@ -21,55 +77,66 @@ def natural_keys(text):
     return [atoi(c) for c in re.split(r'(\d+)', text)]
 
 def make_heatmap():
-  fileinput = '../output/project.avi'
+  fileinput = '../output/project_2.avi'
   cap = cv2.VideoCapture(fileinput)
   fgbg = cv2.createBackgroundSubtractorMOG2()
+  #fgbg = cv2.createBackgroundSubtractorKNN()
 
-  #num_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-  num_frames = 100
+  num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+  #num_frames = 150
 
   bar = Bar('Processing Frames', max=num_frames)
   for i in range(0, num_frames):
+    ret, frame = cap.read()
+    h, w, layers = frame.shape
+    a = 125
+    frame = frame[int(h/2-a):int(h/2+a), int(w/2-a):int(w/2+a)]
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.inRange(gray, 50, 175)
+    cv2.imwrite('../output/gray.jpg', gray)
     if i == 0:
-      ret, frame = cap.read()
       first_frame = copy.deepcopy(frame)
-      gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
       height, width = gray.shape[:2]
       accum_image = np.zeros((height, width), np.uint8)
     else:
-      ret, frame = cap.read()
-      gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-      fgmask = fgbg.apply(gray)  
+      fgmask = fgbg.apply(gray)
       cv2.imwrite('../output/diff-bkgnd-frame.jpg', fgmask)
 
-      thresh = 2
-      maxValue = 2
+      thresh = 4
+      maxValue = 4
       ret, th1 = cv2.threshold(fgmask, thresh, maxValue, cv2.THRESH_BINARY)
-      #th2 = cv2.adaptiveThreshold(filter,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
-      cv2.imwrite('diff-th1.jpg', th1)
+      #th1 = cv2.adaptiveThreshold(fgmask,2,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,11,2)
+      #th1 = cv2.adaptiveThreshold(fgmask,2,cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY,11,2)
+      cv2.imwrite('../output/diff-th1.jpg', th1)
 
       accum_image = cv2.add(accum_image, th1)
       cv2.imwrite('../output/mask.jpg', accum_image)
+
+      color_image_video = im_color = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
+      video_frame = cv2.addWeighted(frame, 0.7, color_image_video, 0.7, 0)
+
+      name = "../output/frames/frame%d.jpg" % i
+      cv2.imwrite(name, video_frame)
 
       if cv2.waitKey(1) & 0xFF == ord('q'):
         break
     bar.next()
 
-  color_image = im_color = cv2.applyColorMap(accum_image, cv2.COLORMAP_HOT)
-  cv2.imwrite('diff-color.jpg', color_image)
+  cv2.imwrite('../output/diff-color.jpg', color_image_video)
 
-  result_overlay = cv2.addWeighted(first_frame, 0.7, color_image, 0.7, 0)
-  cv2.imwrite('diff-overlay.jpg', result_overlay)
+  result_overlay = cv2.addWeighted(first_frame, 0.7, color_image_video, 0.7, 0)
+  cv2.imwrite('../output/diff-overlay.jpg', result_overlay)
 
   bar.finish()
   cap.release()
 
-  #make_video('/home/pi/git/Camera_App/output/frames/', '../output/heatmap.avi')    
-  #name = "../output/frames/frame%d.jpg" % i
-  #cv2.imwrite(name, video_frame)
+  make_video('/home/pi/git/Camera_App/output/frames/', '../output/heatmap.avi')    
 
-def make_video(input, output):
+def make_video(input, output, frame_count=None):
   img_array = sorted(glob.glob(input + '*.jpg'), key=os.path.getmtime)
+
+  #if frame_count:
+  #  img_array = img_array[0::12]
 
   img = cv2.imread(img_array[0])
   height, width, layers = img.shape
@@ -79,12 +146,19 @@ def make_video(input, output):
 
   bar = Bar('Creating Video', max=len(img_array))
   for img in img_array:
-    out.write(cv2.imread(os.path.join(input, img)))
+    img_path = os.path.join(input, img)
+    text = 'testing'
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    frame = cv2.imread(img_path)
+    drawTime(frame, img_path)
+    drawTitle(frame, 'Planth Growth Timelapse')
+    #cv2.putText(frame, text, (50, 50), font, 2, (255, 255, 0), 2)
+    out.write(frame)
     bar.next()
 
   out.release()
   bar.finish()
 
 if __name__ == "__main__":
-  #make_video('/home/pi/git/Camera_App/sample_images/', '../output/project.avi')
-  make_heatmap()
+  make_video('/home/pi/git/Camera_App/sample_images/', '../output/project.avi', 1)
+  #make_heatmap()
