@@ -20,7 +20,7 @@ def main():
       break
 
     if timenow.minute % 5 == 0:
-      filename = filename = '/home/pi/git/Camera_App/sample_images/image_' + str(timenow.day) + "_" +  str(timenow.hour) + "_" + str(timenow.minute) + ".jpg"
+      filename = filename = '/home/pi/git/Camera_App/sample_images_2/image_' + str(timenow.day) + "_" +  str(timenow.hour) + "_" + str(timenow.minute) + ".jpg"
       if not os.path.exists(filename):
         try:
           cv2.imwrite(filename, frame)

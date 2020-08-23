@@ -132,20 +132,33 @@ def make_heatmap():
 
   make_video('/home/pi/git/Camera_App/output/frames/', '../output/heatmap.avi')    
 
+def filter():
+  pass
+
 def make_video(input, output, frame_count=None):
   img_array = sorted(glob.glob(input + '*.jpg'), key=os.path.getmtime)
-
-  #if frame_count:
-  #  img_array = img_array[0::12]
+  img_array.extend(sorted(glob.glob('/home/pi/git/Camera_App/sample_images_2/' + '*.jpg'), key=os.path.getmtime))
 
   img = cv2.imread(img_array[0])
   height, width, layers = img.shape
   size = (width,height)
 
-  out = cv2.VideoWriter(output, cv2.VideoWriter_fourcc(*'DIVX'), 60, size)
+  out = cv2.VideoWriter(output, cv2.VideoWriter_fourcc(*'DIVX'), 120, size)
 
   bar = Bar('Creating Video', max=len(img_array))
-  for img in img_array:
+  for idx, img in enumerate(img_array):
+    img_path = os.path.join(input, img)
+    timestamp = os.path.getmtime(img_path)
+    time_date = datetime.fromtimestamp(timestamp)
+
+    if str(time_date.minute)[-1] == "0":
+      bar.next()
+      continue
+
+    if str(time_date.day) == "3":
+      if any(x in str(time_date.hour) for x in ["12","13","14","15","16","17"]):
+        continue
+
     img_path = os.path.join(input, img)
     text = 'testing'
     font = cv2.FONT_HERSHEY_SIMPLEX
